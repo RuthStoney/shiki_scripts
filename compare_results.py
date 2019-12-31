@@ -36,7 +36,19 @@ for path in paths:
         dfl=pd.read_csv(path+"/PATHWAYS.tsv", sep='\t')
         dfl.insert(0, "file", path.split("/")[-1])
         Uniman=pd.concat([Uniman, dfl])
-       
+     
+        
+group='SILICO'
+paths = [x[0] for x in os.walk('results-master/'+group+'/')]
+
+Silico = pd.DataFrame()
+for path in paths:
+#        find the pathway files
+    if Path(path+'/pathways.csv').is_file():
+    
+        dfl=pd.read_csv(path+"/pathways.csv", sep='\t')
+        dfl.insert(0, "file", path.split("/")[-1])
+        Silico=pd.concat([Silico, dfl])
 
 # =============================================================================
 # bar charts
@@ -47,6 +59,7 @@ import numpy as np
 # count how many times each pathway is present      
 count_man=Counter(Uniman['file'])        
 count_epfl=Counter(Epfl['file'])
+count_silico=Counter(Silico['file'])
 
 # uniman counts
 y_pos = np.arange(len(count_man))
@@ -55,6 +68,9 @@ plt.xticks(y_pos, count_man.keys(), rotation='vertical')
 
 # for pathways mapped by multiple locations map the numbers
 Epfl_Man = set(count_man.keys()).intersection(set(count_epfl.keys()))
+Silico_Man = set(count_man.keys()).intersection(set(count_silico.keys()))
+Silico_Epfl = set(count_epfl.keys()).intersection(set(count_silico.keys()))
+all_comp = Epfl_Man|Silico_Man|Silico_Epfl
 
 # comparison bar chart
 n_groups = len(Epfl_Man)
@@ -88,9 +104,12 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-
+# =============================================================================
 # look at pathway contents
-chav =Epfl[Epfl['file']=="chavicol"]
+# =============================================================================
+
+
+chav =Epfl[Epfl['file']=="methylbenzoate"]
 chav['P_PR_INTERMEDIATES']=[list(filter(None, x.split(';'))) for x in chav['P_PR_INTERMEDIATES']]
 chav['P_PR_BOUNDARY']=[list(filter(None, x.split('|'))) for x in chav['P_PR_BOUNDARY']]
 
