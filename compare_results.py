@@ -67,55 +67,70 @@ y_pos = np.arange(len(count_man))
 plt.bar(y_pos, count_man.values())
 plt.xticks(y_pos, count_man.keys(), rotation='vertical')
 
+
 # for pathways mapped by multiple locations map the numbers
 Epfl_Man = set(count_man.keys()).intersection(set(count_epfl.keys()))
 Silico_Man = set(count_man.keys()).intersection(set(count_silico.keys()))
 Silico_Epfl = set(count_epfl.keys()).intersection(set(count_silico.keys()))
 all_comp = Epfl_Man|Silico_Man #|Silico_Epfl
 
-# comparison bar chart
-n_groups = len(all_comp)
-vals_man = [count_man[k] for k in all_comp]
-vals_epfl = [count_epfl[k] for k in all_comp]
-vals_silico = [count_silico[k] for k in all_comp]
+def plot_multibar(count_man, count_epfl, count_silico):
+    
 
-# create plot
-fig, ax = plt.subplots()
-index = np.arange(n_groups)
-bar_width = 0.3
-opacity = 0.8
+    
+    # comparison bar chart
+    n_groups = len(all_comp)
+    vals_man = [count_man[k] for k in all_comp]
+    vals_epfl = [count_epfl[k] for k in all_comp]
+    vals_silico = [count_silico[k] for k in all_comp]
+    
+    # create plot
+    fig, ax = plt.subplots()
+    index = np.arange(n_groups)
+    bar_width = 0.3
+    opacity = 0.8
+    
+    rects1 = plt.bar(index, vals_man, bar_width,
+    alpha=opacity,
+    color='b',
+    label='UNIMAN')
+    
+    rects2 = plt.bar(index + bar_width, vals_epfl, bar_width,
+    alpha=opacity,
+    color='g',
+    label='EPFL')
+    
+    rects3 = plt.bar(index + bar_width*2, vals_silico, bar_width,
+    alpha=opacity,
+    color='r',
+    label='SILICO')
+    
+    plt.xlabel('Compound')
+    plt.ylabel('Number of pathways')
+    plt.title('Common compound pathways UNMAN/EPFL')
+    plt.xticks(index + bar_width, all_comp, rotation='vertical')
+    plt.yscale('log')
+    plt.ylabel('log')
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
 
-rects1 = plt.bar(index, vals_man, bar_width,
-alpha=opacity,
-color='b',
-label='UNIMAN')
 
-rects2 = plt.bar(index + bar_width, vals_epfl, bar_width,
-alpha=opacity,
-color='g',
-label='EPFL')
-
-rects3 = plt.bar(index + bar_width*2, vals_silico, bar_width,
-alpha=opacity,
-color='r',
-label='SILICO')
-
-plt.xlabel('Compound')
-plt.ylabel('Number of pathways')
-plt.title('Common compound pathways UNMAN/EPFL')
-plt.xticks(index + bar_width, all_comp, rotation='vertical')
-plt.yscale('log')
-plt.ylabel('log')
-plt.legend()
-
-plt.tight_layout()
-plt.show()
-
+plot_multibar(count_man, count_epfl, count_silico)
 # =============================================================================
 # look at pathway contents
 # =============================================================================
+data=pd.DataFrame(columns=["MAN", "SILICO_before", "SILICO_after", "EPFL_before", "EPFL_after"], index=sorted(all_comp))
 
-for target in all_comp:
+count_epfl2= count_epfl.copy()
+
+for target in sorted(all_comp):
+    
+    data.loc[target, "MAN"] = count_man[target]
+    if Epfl[Epfl['file']==target].shape[0]>0:
+        data.loc[target, "EPFL_before"] = Epfl[Epfl['file']==target].shape[0]
+    
     # process the target 
     if Epfl[Epfl['file']==target].shape[0]==0:
         print (target +" not in epfl")
@@ -126,10 +141,13 @@ for target in all_comp:
         comp = Epfl.loc[Epfl.file==target].copy() 
         comp['P_PR_INTERMEDIATES']=[list(filter(None, x.split(';'))) for x in comp['P_PR_INTERMEDIATES']]
 
-        print("total number of pathways in "+str(len(comp)))
-        
+        print("epfl total number of pathways in "+str(len(comp)))
         unique_intermed = list(set(tuple(sorted(sub)) for sub in comp['P_PR_INTERMEDIATES']))
         print("length once all identical intermediate lists removed "+ str(len(unique_intermed)) )
+        data.loc[target, "EPFL_after"] = len(unique_intermed)
+        print("number in manchester  "+ str(count_man[target] ))
+        
+        count_epfl2[target]=len(unique_intermed)
         
         if len(unique_intermed)>2:
     
@@ -146,13 +164,16 @@ for target in all_comp:
                     
             # heatmap
             import seaborn as sns; sns.set(color_codes=True)
-            g = sns.clustermap(dist).fig.suptitle(target)
+            g = sns.clustermap(dist).fig.suptitle("EPFL "+target)
+            fig=g.get_figure()
+            fig.savefig("EPFL_" + target+"_heatmap.png")
         
         print("\n")
 
 
-
+count_silico2= count_silico.copy()
 for target in all_comp:
+    data.loc[target, "SILICO_before"] = Silico[Silico['file']==target].shape[0]
     # process the target 
     if Silico[Silico['file']==target].shape[0]==0:
         print (target +" not in Silico")
@@ -165,10 +186,13 @@ for target in all_comp:
 
         comp['P_PR_INTERMEDIATES']=[list(filter(None, str(x).split(' | '))) if type(x)==str else 'NA'  for x in comp['P_PR_INTERMEDIATES']]
 
-        print("total number of pathways is "+str(len(comp)))
-        
+        print("silico total number of pathways is "+str(len(comp)))
         unique_intermed = list(set(tuple(sorted(sub)) for sub in comp['P_PR_INTERMEDIATES']))
         print("length once all identical intermediate lists removed "+ str(len(unique_intermed)) )
+        data.loc[target, "SILICO_after"] = len(unique_intermed)
+        print("number in manchester  "+ str(count_man[target] ))
+        
+        count_silico2[target]=len(unique_intermed)
         
         if len(unique_intermed)>2:
     
@@ -185,15 +209,17 @@ for target in all_comp:
                     
             # heatmap
             import seaborn as sns; sns.set(color_codes=True)
-            g = sns.clustermap(dist).fig.suptitle(target)
+            g = sns.clustermap(dist).fig.suptitle("SILICO " + target)
+            fig=g.get_figure()
+            fig.savefig("SILICO_" + target+"_heatmap.png")
         
         print("\n")
 
 
 
+plot_multibar(count_man, count_epfl2, count_silico2)
 
-
-
+data.to_csv("paths_SILICO_EPFL.csv")
 
 # =============================================================================
 # # dendrogram
