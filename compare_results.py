@@ -4,8 +4,12 @@ import os.path
 from pathlib import Path
 import pandas as pd
 from collections import Counter
-import math
-
+import csv
+import seaborn as sns; 
+sns.set(color_codes=True)
+import scipy.spatial as sp
+import scipy.cluster.hierarchy as hc
+import re
 # =============================================================================
 # feed in the files
 # =============================================================================
@@ -123,8 +127,24 @@ plot_multibar(count_man, count_epfl, count_silico)
 # =============================================================================
 data=pd.DataFrame(columns=["MAN", "SILICO_before", "SILICO_after", "EPFL_before", "EPFL_after"], index=sorted(all_comp))
 
-count_epfl2= count_epfl.copy()
 
+
+
+def sorted_nicely( l ):
+    """ Sorts the given iterable in the way that is expected.
+ 
+    Required arguments:
+    l -- The iterable to be sorted.
+ 
+    """
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key = alphanum_key)
+
+def jac(list1, list2):
+    return 1-(len(set(list1).intersection(set(list2)))/len(set(list1).union(set(list2)))) 
+
+count_epfl2= count_epfl.copy()
 for target in sorted(all_comp):
     
     data.loc[target, "MAN"] = count_man[target]
@@ -150,28 +170,37 @@ for target in sorted(all_comp):
         count_epfl2[target]=len(unique_intermed)
         
         if len(unique_intermed)>2:
-    
             # =============================================================================
             # clustering
             # =============================================================================
             # CALCULATE JACCARD DISTANCES
-            def jac(list1, list2):
-                return 1-(len(set(list1).intersection(set(list2)))/len(set(list1).union(set(list2))))    
-            # make a list
-            l=[ jac(i1, i2) for i1 in unique_intermed for i2 in unique_intermed ]
-            # turn it into a array
-            dist=np.asarray(l).reshape(len(unique_intermed), len(unique_intermed))
-                    
+            names=[str(x) for x in list(range(1,len(unique_intermed)+1))]
+            # make the dict of pathways
+            unique_intermed_dict=dict(zip(names, unique_intermed))
+            with open('paths_epfl_' + target + '.csv', 'w') as f:
+                for key in unique_intermed_dict.keys():
+                    f.write("%s,%s\n"%(key,unique_intermed_dict[key]))
+            
+            
+            dist2 = pd.DataFrame(index=names, columns=names)
+            for k1 in list(unique_intermed_dict):
+                for k2 in list(unique_intermed_dict):
+                    dist2.loc[k1,k2]=jac(unique_intermed_dict[k1],unique_intermed_dict[k2])
+                        
             # heatmap
-            import seaborn as sns; sns.set(color_codes=True)
-            g = sns.clustermap(dist).fig.suptitle("EPFL "+target)
-            fig=g.get_figure()
-            fig.savefig("EPFL_" + target+"_heatmap.png")
-        
+            DF_dism = dist2.astype(float)
+            linkage = hc.linkage(sp.distance.squareform(DF_dism), method='average')
+            g=sns.clustermap(DF_dism, row_linkage=linkage, col_linkage=linkage, yticklabels=1, figsize=(5,DF_dism.shape[0]/5))
+            g.savefig("EPFL_" + target+"_heatmap long.png")
+            
+            g=sns.clustermap(DF_dism, row_linkage=linkage, col_linkage=linkage, yticklabels=1)
+            g.savefig("EPFL_" + target+"_heatmap.png")
+
         print("\n")
 
 
 count_silico2= count_silico.copy()
+
 for target in all_comp:
     data.loc[target, "SILICO_before"] = Silico[Silico['file']==target].shape[0]
     # process the target 
@@ -200,19 +229,24 @@ for target in all_comp:
             # clustering
             # =============================================================================
             # CALCULATE JACCARD DISTANCES
-            def jac(list1, list2):
-                return 1-(len(set(list1).intersection(set(list2)))/len(set(list1).union(set(list2))))    
-            # make a list
-            l=[ jac(i1, i2) for i1 in unique_intermed for i2 in unique_intermed ]
-            # turn it into a array
-            dist=np.asarray(l).reshape(len(unique_intermed), len(unique_intermed))
-                    
+            names=[str(x) for x in list(range(1,len(unique_intermed)+1))]
+            unique_intermed_dict=dict(zip(names, unique_intermed))
+            with open('paths_epfl_' + target + '.csv', 'w') as f:
+                for key in unique_intermed_dict.keys():
+                    f.write("%s,%s\n"%(key,unique_intermed_dict[key]))
+            
+            dist2 = pd.DataFrame(index=names, columns=names)
+            for k1 in list(unique_intermed_dict):
+                for k2 in list(unique_intermed_dict):
+                    dist2.loc[k1,k2]=jac(unique_intermed_dict[k1],unique_intermed_dict[k2])
+                        
             # heatmap
-            import seaborn as sns; sns.set(color_codes=True)
-            g = sns.clustermap(dist).fig.suptitle("SILICO " + target)
-            fig=g.get_figure()
-            fig.savefig("SILICO_" + target+"_heatmap.png")
-        
+            DF_dism = dist2.astype(float)
+            linkage = hc.linkage(sp.distance.squareform(DF_dism), method='average')
+            g=sns.clustermap(DF_dism, row_linkage=linkage, col_linkage=linkage)
+            g.savefig("SILICO_" + target+"_heatmap.png")
+
+       
         print("\n")
 
 
